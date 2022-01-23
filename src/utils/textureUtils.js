@@ -1,7 +1,7 @@
 import { NearestFilter, NoColors } from "three";
 import { Texture } from "three";
-import { MeshBasicMaterial } from "three";
-import { ImageFileHeader, ImagePixelHeader, IMAGE_TYPE } from "../structs";
+import { FaceColors, MeshBasicMaterial } from "three";
+import { ImageFileHeader, ImagePixelHeader, IMAGE_TYPE, TrackTextureIndex } from "../structs";
 
 // TODO: Rewrite
 const renderTIMToCanvas = (buffer) => {
@@ -193,6 +193,8 @@ const createMeshFaceMaterial = (images, vertexColors, side) => {
 
 		const material = new MeshBasicMaterial({ map: texture });
 		material.vertexColors = vertexColors;
+		material.side = side;
+		material.alphaTest = 0.5;
 
 		const isWeapontile = i === 3 && vertexColors === FaceColors;
 
@@ -200,9 +202,6 @@ const createMeshFaceMaterial = (images, vertexColors, side) => {
 			material.vertexColors = NoColors;
 			material.name = 'weaponTile'
 		}
-
-		material.side = side;
-		material.alphaTest = 0.5;
 
 		return material;
 	})
@@ -212,13 +211,43 @@ const createMeshFaceMaterial = (images, vertexColors, side) => {
 	return materials;
 };
 
-export const compressedTexturesToMaterials = textures => {
+export const getNearLodTexture = (images, textureIndex) => {
+	// Load Track Texture Index
+	var indexEntries = textureIndex.byteLength / TrackTextureIndex.byteLength;
+	var textureIndex = TrackTextureIndex.readStructs(textureIndex, 0, indexEntries);
+
+	// Extract the big (near) versions of these textures only. The near 
+	// version is composed of 4x4 32px tiles.
+	var composedImages = [];
+	for (var i = 0; i < textureIndex.length; i++) {
+		var idx = textureIndex[i];
+
+		var composedImage = document.createElement('canvas');
+		composedImage.width = 128;
+		composedImage.height = 128;
+		var ctx = composedImage.getContext('2d');
+
+		for (var x = 0; x < 4; x++) {
+			for (var y = 0; y < 4; y++) {
+				var image = images[idx.near[y * 4 + x]];
+				ctx.drawImage(image, x * 32, y * 32)
+			}
+		}
+		composedImages.push(composedImage);
+	}
+	return composedImages;
+}
+
+export const compressedTexturesToMaterials = (textures, { isTrack, textureIndex } = {}) => {
 	if (!textures) {
 		return [];
 	}
 
 	const rawImages = unpackImages(textures);
 	const images = rawImages.map(image => renderTIMToCanvas(image));
-	const materials = createMeshFaceMaterial(images);
+
+	const adjustedImages = isTrack ? getNearLodTexture(images, textureIndex) : images;
+
+	const materials = createMeshFaceMaterial(adjustedImages);
 	return materials;
 }

@@ -1,5 +1,6 @@
 import { ObjectHeader, Polygon, PolygonHeader, Vertex } from "../structs";
 
+// Need to rewrite use of `offset` here.
 const readObjectFromBufferAtOffset = (buffer, offset) => {
 	let currentOffset = offset;
 
@@ -9,10 +10,10 @@ const readObjectFromBufferAtOffset = (buffer, offset) => {
 	const vertices = Vertex.readStructs(buffer, currentOffset, header.vertexCount);
 	currentOffset += Vertex.byteLength * header.vertexCount;
 
-	const polygons = [...Array(header.polygonCount)].map(_ => {
+	const polygons = [...Array(header.polygonCount)].map((_, i) => {
 		const polygonHeader = PolygonHeader.readStructs(buffer, currentOffset, 1)[0];
-
 		const polygonType = Polygon[polygonHeader.type];
+
 		const polygon = polygonType.readStructs(buffer, currentOffset, 1)[0];
 		currentOffset += polygonType.byteLength;
 
@@ -23,7 +24,7 @@ const readObjectFromBufferAtOffset = (buffer, offset) => {
 		header: header,
 		vertices: vertices,
 		polygons: polygons,
-		byteLength: currentOffset
+		finalOffset: currentOffset
 	};
 };
 
@@ -33,11 +34,11 @@ export const createObjectsFromBuffer = buffer =>
 		if (buffer.byteLength === offset) {
 			return { objects, offset };
 		}
-		const object = readObjectFromBufferAtOffset(buffer, offset);
 
+		const object = readObjectFromBufferAtOffset(buffer, offset);
 		return {
 			objects: [...objects, object],
-			offset: offset + object.byteLength,
+			offset: object.finalOffset,
 		}
 	}, {
 		objects: [],

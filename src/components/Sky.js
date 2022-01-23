@@ -1,21 +1,24 @@
-import React, { useEffect } from 'react';
-import useModels from '../hooks/useModel';
+import React, { useEffect, useRef } from 'react';
+import useModels from '../hooks/useModels';
 
 const Sky = ({ track }) => {
-	const sky = useModels({
+	const models = useModels({
 		textures: track.path + '/SKY.CMP',
 		objects: track.path + '/SKY.PRM'
-	}, ([model]) => {
-		model.scale.set(48, 48, 48);
-		return model;
 	});
 
-	if (!sky) {
+	if (!models) {
 		return null;
 	}
 
-	console.log(sky)
-	return <primitive object={sky} />
+	const model = models[0];
+	return (
+		<group position={model.position}>
+			<mesh scale={48}>
+				<bufferGeometry {...model.geometry} />
+				{model.materials.map(material => <meshBasicMaterial attachArray="material" key={material.id} {...material} />)}
+			</mesh>
+		</group >
+	)
 }
-
 export default Sky;
