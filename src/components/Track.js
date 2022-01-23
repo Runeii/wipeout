@@ -7,7 +7,9 @@ const Track = ({ files, ...rest }) => {
 	if (!track) {
 		return null;
 	}
+
 	const { geometry, id, materials } = track;
+
 	return (
 		<group key={id} {...rest}>
 			<mesh>

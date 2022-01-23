@@ -67,62 +67,73 @@ const createGeometry = (object, materials) => {
 	return geometry.toBufferGeometry();
 };
 
-const createTrackGeometry = (facesFile, trackTexture, vertices) => {
-	var geometry = new Geometry();
-
-	// Load vertices
-	var vertexCount = vertices.byteLength / TrackVertex.byteLength;
-	var rawVertices = TrackVertex.readStructs(vertices, 0, vertexCount);
-
-	for (var i = 0; i < rawVertices.length; i++) {
-		geometry.vertices.push(new Vector3(rawVertices[i].x, -rawVertices[i].y, -rawVertices[i].z));
+const addTextures = (face, trackTexture) => {
+	if (!trackTexture) {
+		return face;
 	}
 
-	// Load Faces
+	const { flags, tile } = trackTexture;
+
+	return { ...face, flags, tile }
+}
+
+const createFace = (face, trackTexture) => {
+	const { color, flags, indices, tile: materialIndex } = addTextures(face, trackTexture);
+	const adjustedColor = flags && TrackFace.FLAGS.BOOST ? new Color(0.25, 0.25, 2) : int32ToColor(color);
+
+	return [
+		new Face3(indices[0], indices[1], indices[2], null, adjustedColor, materialIndex),
+		new Face3(indices[2], indices[3], indices[0], null, adjustedColor, materialIndex),
+	]
+}
+
+const createFaceVertexUvs = (trackTexture) => {
+	const { flags } = trackTexture ?? {};
+	const flipX = (flags && TrackFace.FLAGS.FLIP) ? 1 : 0;
+
+	return [
+		[
+			new Vector2(1 - flipX, 1),
+			new Vector2(0 + flipX, 1),
+			new Vector2(0 + flipX, 0)
+		],
+		[
+			new Vector2(0 + flipX, 0),
+			new Vector2(1 - flipX, 0),
+			new Vector2(1 - flipX, 1)
+		],
+	];
+}
+
+const createTrackGeometry = (facesFile, trackTextureBuffer, vertices) => {
+	const geometry = new Geometry();
+
+	// Vertices
+	const vertexCount = vertices.byteLength / TrackVertex.byteLength;
+	const rawVertices = TrackVertex.readStructs(vertices, 0, vertexCount);
+	geometry.vertices = rawVertices.map(({ x, y, z }) => new Vector3(x, -y, -z))
+
+	// Faces & Textures
 	var faceCount = facesFile.byteLength / TrackFace.byteLength;
-	var faces = TrackFace.readStructs(facesFile, 0, faceCount);
+	const trackTextureCount = trackTextureBuffer ? trackTextureBuffer.byteLength / TrackTexture.byteLength : null;
+	const trackTextures = trackTextureBuffer ? TrackTexture.readStructs(trackTexture, 0, trackTextureCount) : [];
 
-	// Load track texture file (WO2097/WOXL only)
-	if (trackTexture) {
-		var trackTextureCount = trackTexture.byteLength / TrackTexture.byteLength;
-		var trackTextures = TrackTexture.readStructs(trackTexture, 0, trackTextureCount);
-
-		// Copy data from TEX to TRF structure
-		for (var i = 0; i < faces.length; i++) {
-			var f = faces[i];
-			var t = trackTextures[i];
-
-			f.tile = t.tile;
-			f.flags = t.flags;
+	const { faces, faceVertexUvs } = TrackFace.readStructs(facesFile, 0, faceCount).reduce((result, face, i) => (
+		{
+			...result,
+			faces: [
+				...result.faces,
+				...createFace(face, trackTextures?.[i])
+			],
+			faceVertexUvs: [
+				...result.faceVertexUvs,
+				...createFaceVertexUvs(trackTextures?.[i])
+			]
 		}
-	}
+	), { faces: [], faceVertexUvs: [] })
 
-	for (var i = 0; i < faces.length; i++) {
-		var f = faces[i];
-
-		var color = int32ToColor(f.color);
-		var materialIndex = f.tile;
-
-		if (f.flags & TrackFace.FLAGS.BOOST) {
-			//render boost tile as bright blue
-			color = new Color(0.25, 0.25, 2);
-		}
-
-		geometry.faces.push(new Face3(f.indices[0], f.indices[1], f.indices[2], null, color, materialIndex));
-		geometry.faces.push(new Face3(f.indices[2], f.indices[3], f.indices[0], null, color, materialIndex));
-
-		var flipx = (f.flags & TrackFace.FLAGS.FLIP) ? 1 : 0;
-		geometry.faceVertexUvs[0].push([
-			new Vector2(1 - flipx, 1),
-			new Vector2(0 + flipx, 1),
-			new Vector2(0 + flipx, 0)
-		]);
-		geometry.faceVertexUvs[0].push([
-			new Vector2(0 + flipx, 0),
-			new Vector2(1 - flipx, 0),
-			new Vector2(1 - flipx, 1)
-		]);
-	}
+	geometry.faces = faces
+	geometry.faceVertexUvs = [faceVertexUvs]
 
 	return geometry.toBufferGeometry();
 }
@@ -146,7 +157,6 @@ export const createModel = async (urls) => {
 
 export const createTrack = async (urls) => {
 	const { faces, textures, textureIndex, trackTexture, vertices } = await loadBinaries(urls);
-	console.log(faces, trackTexture, vertices)
 
 	const materials = compressedTexturesToMaterials(
 		textures,
