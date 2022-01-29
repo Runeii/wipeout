@@ -7,7 +7,7 @@ import Track from './components/Track';
 import { TRACKS_WIPEOUT2097 } from './CONSTANTS';
 
 const App = () => {
-	const track = TRACKS_WIPEOUT2097[2];
+	const track = TRACKS_WIPEOUT2097[0];
 	const { path } = track;
 
 	const [cameraSpline, setCameraSpline] = useState(null);

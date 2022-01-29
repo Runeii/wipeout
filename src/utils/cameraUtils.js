@@ -3,21 +3,33 @@ import { HermiteCurve3 } from "../old/hermite";
 import { TrackSection } from "../structs";
 
 
-const getSectionCentrePosition = (section, faces, vertices) => {
+const getSectionCentrePosition = (section, faces, vertices, index) => {
 	const { firstFace, numFaces } = section;
 
 	const position = new Vector3();
-	const vertexCount = faces.slice(firstFace, firstFace + numFaces)
-		.reduce((result, face) => {
+	const vertexCount = faces.slice(firstFace, firstFace + numFaces - 1)
+		.reduce((result, face, j) => {
+			if (index === 0) {
+				console.log(j, numFaces);
+			}
 			if (!face.flags) {
 				return result;
 			}
 
-			face.indices.forEach(index => position.add(vertices[index]));
+			face.indices.forEach(i => {
+				position.add(vertices[i])
+				if (index === 0) {
+					console.log(vertices[i], position, face.indices.length, i)
+				}
+			});
 			return result + face.indices.length
 		}, 0);
 
 	position.divideScalar(vertexCount)
+
+	if (index === 0) {
+		console.log(position)
+	}
 	return position;
 }
 
@@ -33,7 +45,7 @@ export const createCameraSpline = (buffer, { faces, vertices }) => {
 
 		const isJump = !!(section.flags && TrackSection.FLAGS.JUMP);
 
-		const point = getSectionCentrePosition(section, faces, vertices);
+		const point = getSectionCentrePosition(section, faces, vertices, index);
 		const updatedPoints = [...points, point];
 
 		return {

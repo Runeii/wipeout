@@ -99,7 +99,6 @@ Wipeout.prototype.animate = function () {
 Wipeout.prototype.updateSplineCamera = function () {
 	var damping = 0.90;
 	var time = this.ticks * 1000 / 60;
-	console.log(time)
 	var loopTime = this.cameraSpline.points.length * 100;
 
 	// Camera position along the spline
@@ -929,7 +928,6 @@ Wipeout.prototype.createTrack = function (files) {
 	this.scene.add(model);
 
 
-	console.log(faces)
 	this.createCameraSpline(files.sections, faces, geometry.vertices);
 };
 
@@ -951,12 +949,12 @@ Wipeout.prototype.createCameraSpline = function (buffer, faces, vertices) {
 		if (s.flags & Wipeout.TrackSection.FLAGS.JUMP)
 			jumpIndexes.push(cameraPoints.length);
 
-		var pos = this.getSectionPosition(s, faces, vertices);
+		var pos = this.getSectionPosition(s, faces, vertices, index);
 		cameraPoints.push(pos);
 
 		index = s.next;
 	} while (index > 0 && index < sections.length);
-	console.log(cameraPoints, jumpIndexes, index)
+
 	//	// Second curve, take junctions when possible
 	//	index = 0;
 	//	do {
@@ -1004,21 +1002,29 @@ Wipeout.prototype.createCameraSpline = function (buffer, faces, vertices) {
 // ----------------------------------------------------------------------------
 // Get track section center position from track vertices
 
-Wipeout.prototype.getSectionPosition = function (section, faces, vertices) {
+Wipeout.prototype.getSectionPosition = function (section, faces, vertices, index) {
 	var verticescount = 0;
 	var position = new THREE.Vector3();
-	console.log(section.firstFace + section.numFaces)
 	for (var i = section.firstFace; i < section.firstFace + section.numFaces; i++) {
 		var face = faces[i];
+		if (index === 0) {
+			console.log(i, section.numFaces);
+		}
 		if (face.flags & Wipeout.TrackFace.FLAGS.TRACK) {
 			for (var j = 0; j < face.indices.length; j++) {
 				var vertex = vertices[face.indices[j]];
 				position.add(vertex);
+				if (index === 0) {
+					console.log(vertex, position, face.indices.length, j)
+				}
 				verticescount++;
 			}
 		}
 	}
 	position.divideScalar(verticescount);
+	if (index === 0) {
+		console.log(position)
+	}
 	return position;
 }
 
@@ -1026,15 +1032,15 @@ Wipeout.prototype.getSectionPosition = function (section, faces, vertices) {
 
 Wipeout.prototype.loadTrack = function (path, loadTEXFile) {
 	var that = this;
-	//this.loadBinaries({
-	//	textures: path + '/SCENE.CMP',
-	//	objects: path + '/SCENE.PRM'
-	//}, function (files) { that.createScene(files); });
+	this.loadBinaries({
+		textures: path + '/SCENE.CMP',
+		objects: path + '/SCENE.PRM'
+	}, function (files) { that.createScene(files); });
 
-	//this.loadBinaries({
-	//	textures: path + '/SKY.CMP',
-	//	objects: path + '/SKY.PRM'
-	//}, function (files) { that.createScene(files, { scale: 48 }); });
+	this.loadBinaries({
+		textures: path + '/SKY.CMP',
+		objects: path + '/SKY.PRM'
+	}, function (files) { that.createScene(files, { scale: 48 }); });
 
 
 	var trackFiles = {

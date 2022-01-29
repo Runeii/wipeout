@@ -55,7 +55,8 @@ const Camera = ({ cameraSpline }) => {
 		}
 
 		var damping = 0.90;
-		const time = clock.getElapsedTime() * 1000;
+		const speed = 1;
+		const time = clock.getElapsedTime() * 1000 * speed;
 		var loopTime = cameraSpline.points.length * 100;
 
 		const position = updateCameraPosition(camera, loopTime, cameraSpline, time, damping);
