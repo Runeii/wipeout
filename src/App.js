@@ -1,5 +1,6 @@
 import { OrbitControls } from '@react-three/drei';
-import React from 'react'
+import React, { useState } from 'react'
+import Camera from './components/Camera';
 import Model from "./components/Model";
 import Sky from './components/Sky';
 import Track from './components/Track';
@@ -9,9 +10,11 @@ const App = () => {
 	const track = TRACKS_WIPEOUT2097[2];
 	const { path } = track;
 
+	const [cameraSpline, setCameraSpline] = useState(null);
+
 	return (
 		<>
-			<OrbitControls />
+			{/*			<OrbitControls /> */}
 			<Model
 				files={{
 					textures: path + '/SCENE.CMP',
@@ -27,7 +30,9 @@ const App = () => {
 					faces: path + '/TRACK.TRF',
 					sections: path + '/TRACK.TRS'
 				}}
+				setCameraSpline={setCameraSpline}
 			/>
+			<Camera cameraSpline={cameraSpline} />
 		</>
 	);
 }

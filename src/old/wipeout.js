@@ -99,7 +99,7 @@ Wipeout.prototype.animate = function () {
 Wipeout.prototype.updateSplineCamera = function () {
 	var damping = 0.90;
 	var time = this.ticks * 1000 / 60;
-
+	console.log(time)
 	var loopTime = this.cameraSpline.points.length * 100;
 
 	// Camera position along the spline
@@ -121,11 +121,13 @@ Wipeout.prototype.updateSplineCamera = function () {
 	var cn = cameraPos.sub(this.splineCamera.position);
 	var tn = lookAtPos.sub(this.splineCamera.currentLookAt);
 	var roll = (Math.atan2(cn.z, cn.x) - Math.atan2(tn.z, tn.x));
+
 	roll += (roll > Math.PI)
 		? -Math.PI * 2
 		: (roll < -Math.PI) ? Math.PI * 2 : 0;
 
 	this.splineCamera.roll = this.splineCamera.roll * 0.95 + (roll) * 0.1;
+	return
 	this.splineCamera.up = (new THREE.Vector3(0, 1, 0)).applyAxisAngle(
 		this.splineCamera.position.clone().sub(this.splineCamera.currentLookAt).normalize(),
 		this.splineCamera.roll * 0.25
@@ -528,7 +530,7 @@ Wipeout.prototype.createModelFromObject = function (object, spriteCollection) {
 
 			// We can't use THREE.Sprite here, because they rotate to the camera on
 			// all axis. We just want rotation around the Y axis, so we do it manually.
-			var spriteMaterial = new THREE.MeshBasicMaterial({ map: this.sceneMaterial.materials[p.texture].map, color: color, alphaTest: 0.5 });
+			var spriteMaterial = new THREE.MeshBasicMaterial({ map: this.sceneMaterial[p.texture].map, color: color, alphaTest: 0.5 });
 			var spriteMesh = new THREE.Mesh(new THREE.PlaneBufferGeometry(p.width, p.height), spriteMaterial);
 
 			var sprite = new THREE.Object3D();
@@ -579,8 +581,6 @@ Wipeout.prototype.createModelFromObject = function (object, spriteCollection) {
 		var mesh = new THREE.Mesh(geometry.toBufferGeometry(), this.sceneMaterial);
 		model.add(mesh);
 	}
-	console.log('Geometry', geometry, geometry.toBufferGeometry())
-	console.log('Mesh', mesh)
 
 	return model;
 };
@@ -882,7 +882,6 @@ Wipeout.prototype.createTrack = function (files) {
 	// Load Faces
 	var faceCount = files.faces.byteLength / Wipeout.TrackFace.byteLength;
 	var faces = Wipeout.TrackFace.readStructs(files.faces, 0, faceCount);
-
 	// Load track texture file (WO2097/WOXL only)
 	if (files.trackTexture) {
 		var trackTextureCount = files.trackTexture.byteLength / Wipeout.TrackTexture.byteLength;
@@ -930,6 +929,7 @@ Wipeout.prototype.createTrack = function (files) {
 	this.scene.add(model);
 
 
+	console.log(faces)
 	this.createCameraSpline(files.sections, faces, geometry.vertices);
 };
 
@@ -956,36 +956,36 @@ Wipeout.prototype.createCameraSpline = function (buffer, faces, vertices) {
 
 		index = s.next;
 	} while (index > 0 && index < sections.length);
+	console.log(cameraPoints, jumpIndexes, index)
+	//	// Second curve, take junctions when possible
+	//	index = 0;
+	//	do {
+	//		var s = sections[index];
+	//		if (s.flags & Wipeout.TrackSection.FLAGS.JUMP)
+	//			jumpIndexes.push(cameraPoints.length);
+	//
+	//		var pos = this.getSectionPosition(s, faces, vertices);
+	//		cameraPoints.push(pos);
+	//
+	//		// Get next section, look for junctions
+	//		if (s.nextJunction != -1 && (sections[s.nextJunction].flags & Wipeout.TrackSection.FLAGS.JUNCTION_START)) {
+	//			index = s.nextJunction;
+	//		}
+	//		else {
+	//			index = s.next;
+	//		}
+	//	} while (index > 0 && index < sections.length);
 
-	// Second curve, take junctions when possible
-	index = 0;
-	do {
-		var s = sections[index];
-		if (s.flags & Wipeout.TrackSection.FLAGS.JUMP)
-			jumpIndexes.push(cameraPoints.length);
-
-		var pos = this.getSectionPosition(s, faces, vertices);
-		cameraPoints.push(pos);
-
-		// Get next section, look for junctions
-		if (s.nextJunction != -1 && (sections[s.nextJunction].flags & Wipeout.TrackSection.FLAGS.JUNCTION_START)) {
-			index = s.nextJunction;
-		}
-		else {
-			index = s.next;
-		}
-	} while (index > 0 && index < sections.length);
-
-	//extend path near jumps by adding tangent vector
-	for (var i = 0; i < jumpIndexes.length; i++) {
-		var index = jumpIndexes[i];
-
-		var jumpPoint = cameraPoints[index];
-		var tangent = jumpPoint.clone().sub(cameraPoints[(index + cameraPoints.length - 1) % cameraPoints.length]);
-		var lengthNext = cameraPoints[(index + 1) % cameraPoints.length].clone().sub(jumpPoint).length();
-
-		jumpPoint.add(tangent.setLength(lengthNext / 4));
-	}
+	//	//extend path near jumps by adding tangent vector
+	//	for (var i = 0; i < jumpIndexes.length; i++) {
+	//		var index = jumpIndexes[i];
+	//
+	//		var jumpPoint = cameraPoints[index];
+	//		var tangent = jumpPoint.clone().sub(cameraPoints[(index + cameraPoints.length - 1) % cameraPoints.length]);
+	//		var lengthNext = cameraPoints[(index + 1) % cameraPoints.length].clone().sub(jumpPoint).length();
+	//
+	//		jumpPoint.add(tangent.setLength(lengthNext / 4));
+	//	}
 
 	this.cameraSpline = new HermiteCurve3(cameraPoints, 0.5, 0.0);
 
@@ -1007,6 +1007,7 @@ Wipeout.prototype.createCameraSpline = function (buffer, faces, vertices) {
 Wipeout.prototype.getSectionPosition = function (section, faces, vertices) {
 	var verticescount = 0;
 	var position = new THREE.Vector3();
+	console.log(section.firstFace + section.numFaces)
 	for (var i = section.firstFace; i < section.firstFace + section.numFaces; i++) {
 		var face = faces[i];
 		if (face.flags & Wipeout.TrackFace.FLAGS.TRACK) {
@@ -1017,7 +1018,6 @@ Wipeout.prototype.getSectionPosition = function (section, faces, vertices) {
 			}
 		}
 	}
-
 	position.divideScalar(verticescount);
 	return position;
 }
@@ -1026,10 +1026,10 @@ Wipeout.prototype.getSectionPosition = function (section, faces, vertices) {
 
 Wipeout.prototype.loadTrack = function (path, loadTEXFile) {
 	var that = this;
-	this.loadBinaries({
-		textures: path + '/SCENE.CMP',
-		objects: path + '/SCENE.PRM'
-	}, function (files) { that.createScene(files); });
+	//this.loadBinaries({
+	//	textures: path + '/SCENE.CMP',
+	//	objects: path + '/SCENE.PRM'
+	//}, function (files) { that.createScene(files); });
 
 	//this.loadBinaries({
 	//	textures: path + '/SKY.CMP',
@@ -1049,7 +1049,7 @@ Wipeout.prototype.loadTrack = function (path, loadTEXFile) {
 		trackFiles.trackTexture = path + '/TRACK.TEX';
 	}
 
-	//	this.loadBinaries(trackFiles, function (files) { that.createTrack(files); });
+	this.loadBinaries(trackFiles, function (files) { that.createTrack(files); });
 };
 
 

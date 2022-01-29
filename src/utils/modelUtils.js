@@ -7,6 +7,7 @@ import { Mesh, PlaneBufferGeometry } from "three";
 import { Face3, Geometry } from "three/examples/jsm/deprecated/Geometry";
 import { POLYGON_TYPE, TrackFace, TrackTexture, TrackVertex } from "../structs";
 import { loadBinaries } from "./assetUtils";
+import { createCameraSpline } from "./cameraUtils";
 import { int32ToColor } from "./mathUtils";
 import { createObjectsFromBuffer } from "./objectUtils";
 import { compressedTexturesToMaterials } from "./textureUtils";
@@ -105,37 +106,39 @@ const createFaceVertexUvs = (trackTexture) => {
 	];
 }
 
-const createTrackGeometry = (facesFile, trackTextureBuffer, vertices) => {
-	const geometry = new Geometry();
-
+const createTrackGeometry = (facesFile, trackTextureBuffer, verticesBuffer) => {
 	// Vertices
-	const vertexCount = vertices.byteLength / TrackVertex.byteLength;
-	const rawVertices = TrackVertex.readStructs(vertices, 0, vertexCount);
-	geometry.vertices = rawVertices.map(({ x, y, z }) => new Vector3(x, -y, -z))
+	const vertexCount = verticesBuffer.byteLength / TrackVertex.byteLength;
+	const rawVertices = TrackVertex.readStructs(verticesBuffer, 0, vertexCount);
+	const vertices = rawVertices.map(({ x, y, z }) => new Vector3(x, -y, -z))
 
 	// Faces & Textures
 	var faceCount = facesFile.byteLength / TrackFace.byteLength;
 	const trackTextureCount = trackTextureBuffer ? trackTextureBuffer.byteLength / TrackTexture.byteLength : null;
 	const trackTextures = trackTextureBuffer ? TrackTexture.readStructs(trackTexture, 0, trackTextureCount) : [];
 
-	const { faces, faceVertexUvs } = TrackFace.readStructs(facesFile, 0, faceCount).reduce((result, face, i) => (
+	// rawFaces returns face objects without conversion to Face3 obj
+	const faces = TrackFace.readStructs(facesFile, 0, faceCount);
+	const { builtFaces, faceVertexUvs } = faces.reduce((result, face, i) => (
 		{
 			...result,
-			faces: [
-				...result.faces,
+			builtFaces: [
+				...result.builtFaces,
 				...createFace(face, trackTextures?.[i])
 			],
 			faceVertexUvs: [
 				...result.faceVertexUvs,
 				...createFaceVertexUvs(trackTextures?.[i])
-			]
+			],
 		}
-	), { faces: [], faceVertexUvs: [] })
+	), { builtFaces: [], faceVertexUvs: [] })
 
-	geometry.faces = faces
+	const geometry = new Geometry();
+	geometry.faces = builtFaces
 	geometry.faceVertexUvs = [faceVertexUvs]
+	geometry.vertices = vertices;
 
-	return geometry.toBufferGeometry();
+	return { bufferGeometry: geometry.toBufferGeometry(), rawGeometry: { faces, vertices } };
 }
 
 const getPosition = object => [object.header.position.x, -object.header.position.y, -object.header.position.z];
@@ -156,7 +159,7 @@ export const createModel = async (urls) => {
 }
 
 export const createTrack = async (urls) => {
-	const { faces, textures, textureIndex, trackTexture, vertices } = await loadBinaries(urls);
+	const { faces, sections, textures, textureIndex, trackTexture, vertices } = await loadBinaries(urls);
 
 	const materials = compressedTexturesToMaterials(
 		textures,
@@ -166,9 +169,11 @@ export const createTrack = async (urls) => {
 		}
 	);
 
+	const { bufferGeometry, rawGeometry } = createTrackGeometry(faces, trackTexture, vertices);
 	return {
+		cameraSpline: createCameraSpline(sections, rawGeometry),
 		id: Math.random() * 1000,
-		geometry: createTrackGeometry(faces, trackTexture, vertices),
+		geometry: bufferGeometry,
 		materials,
 		position: new Vector3(0, 0, 0),
 	};

@@ -1,8 +1,16 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import useTrack from '../hooks/useTrack';
 
-const Track = ({ files, ...rest }) => {
+const Track = ({ files, setCameraSpline, ...rest }) => {
 	const track = useTrack(files);
+
+	useEffect(() => {
+		if (!track) {
+			return;
+		}
+
+		setCameraSpline(track.cameraSpline);
+	}, [track]);
 
 	if (!track) {
 		return null;
